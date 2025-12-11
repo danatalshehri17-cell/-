@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database Service
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: mydjangoappdb
+      POSTGRES_USER: mdhazz
+      POSTGRES_PASSWORD: M&z2!not
+    volumes:
+      # Persistent storage for the database data
+      - postgres_data:/var/lib/postgresql/data/
+    # Optional: Expose the DB port for local development/debugging (remove in production)
+    ports:
+      - "5432:5432"
+
+  # 2. Django Backend Service
+  backend:
+    build:
+      context: ./backend/  # Path to your Django project directory
+      dockerfile: Dockerfile
+    container_name: django_backend
+    command: sh -c "python manage.py migrate && gunicorn --bind 0.0.0.0:8000 core.wsgi:application"
+    volumes:
+      - ./backend/:/usr/src/app/ # Volume for development (optional in prod)
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    # env_file:
+    #   - .env.backend # Use an environment file for variables
+    depends_on:
+      - db # Ensure the database is started before the backend
+    restart: unless-stopped
+
+  # 3. React Frontend Service (Served by Nginx)
+  frontend:
+    build:
+      context: ./frontend/  # Path to your React app directory
+      dockerfile: Dockerfile
+    container_name: react_frontend
+    # Map port 80 in the container to port 80/443 on the host machine
+    # You will map this to 80/443 on your VPS for public access
+    ports:
+      - "80:80"
+    depends_on:
+      - backend # Wait for the backend to be available (less critical, but good practice)
+    restart: unless-stopped
+
+# Volumes for persistent data storage
+volumes:
+  postgres_data:
